@@ -1,0 +1,23 @@
+active: true
+derived: false
+header: |
+  Remote Client Application GUI Layout
+level: 1.0
+links:
+- REQ004: lhsFBkI-TMvMMFEZz6KtXorrowpn5_jkhUin5k2e_X8=
+- REQ005: OS9ThXRShSK3MVRJgZJEUeyRjXvyJBQK9rBzMgwEi84=
+- REQ006: PGZU6oq79wjrveIrRriICZVkrS-8Q3miyykC_ISZ400=
+- REQ007: YjpRHv7usNAX80QEorAWCV8CpDZcLnhdPh-ifGifDpM=
+normative: true
+ref: ''
+reviewed: 9NrtTnPwLGnWYuM5FUCHC5qTj87Kn6lX2gh6F_sZqYk=
+text: |
+  ## Remote Client Application GUI Layout
+
+  | REQ004 - Connection Status |
+  | --- |
+  | Chat Area ( Send REQ005 and received messages REQ006 ) |
+  | REQ007 - Message Log |
+
+  Note:
+  - [remote app gui.png](assets/images/remote%20app%20gui.png) provides a visual representation of the Remote Client Application's GUI layout, illustrating the arrangement of the connection status indicator, chat area, and message log as specified in the requirements.

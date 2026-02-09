@@ -1,0 +1,13 @@
+active: true
+derived: false
+doc:
+  name: Software Design Document
+  title: Software Design Document for _IMOK_
+header: |
+  Open UDP socket connection to Soracom Harvest Data
+level: 11.5
+links: []
+normative: true
+ref: ''
+reviewed: GNrHjES_jXJxylmVLBww_PhdnCY7gnr62M4rDQRc43s=
+text: ''

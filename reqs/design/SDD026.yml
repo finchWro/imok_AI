@@ -1,0 +1,14 @@
+active: true
+derived: false
+doc:
+  name: Software Design Document
+  title: Software Design Document for _IMOK_
+header: |
+  UDP Transmission
+level: 7
+links: []
+normative: true
+ref: ''
+reviewed: 5PeINcf7-TSnrX64gPI8ZeLqcODqsRKi_bsDNiLqFGM=
+text: |
+  UDP port 55555 shall be used for all UDP communications between the Communicator Application and the Remote Client Application.

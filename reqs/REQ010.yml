@@ -1,0 +1,15 @@
+active: true
+derived: false
+doc:
+  name: Requirements
+  title: Requirements for _IMOK_
+header: |
+  Communicator Application — Receive Messages
+level: 3.3
+links:
+- SDD029: uQJ7YcxLymiNqJyx8vPfR-_r69F_HyQV8ErdYEWwQXo=
+normative: true
+ref: ''
+reviewed: tIvaQJqL_Dn5-xt4yXmRVAT2qUmJ9NpRI2cbxmfhPHM=
+text: |
+  The Communicator Application shall receive messages from the Remote Client Application and present them to the user within the GUI.

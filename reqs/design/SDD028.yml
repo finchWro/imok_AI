@@ -1,0 +1,14 @@
+active: true
+derived: false
+doc:
+  name: Software Design Document
+  title: Software Design Document for _IMOK_
+header: |
+  UDP buffer size
+level: 8
+links: []
+normative: true
+ref: ''
+reviewed: qquhn9SPRl7mKK9F30_yw8RvSIHd3Zs5KuNHHEovEOo=
+text: |
+  UDP buffer size is 256.

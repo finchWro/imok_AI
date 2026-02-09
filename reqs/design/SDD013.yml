@@ -1,0 +1,13 @@
+active: true
+derived: false
+doc:
+  name: Software Design Document
+  title: Software Design Document for _IMOK_
+header: |
+  Establish connection with cellular network
+level: 11.3
+links: []
+normative: true
+ref: ''
+reviewed: Rz2NM-GOL-YcBapY2o8oSDL1KtNVov63Rjbl-xTy0Xg=
+text: ''
