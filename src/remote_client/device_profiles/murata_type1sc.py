@@ -127,8 +127,8 @@ class MurataType1SCProfile(BaseDeviceProfile):
 
         # Step 14: Wait for GNSS fix
         logger.info("  Waiting for GNSS fix...")
-        gnss_ok, gnss_urc = serial_manager.wait_for_urc('%IGNSSEVU:"FIX"', timeout=300)
-        if gnss_ok:
+        gnss_ok, gnss_urc = serial_manager.wait_for_urc('%IGNSSEVU:', timeout=300)
+        if gnss_ok and '"FIX"' in gnss_urc:
             self._parse_gnss_fix(gnss_urc)
             logger.info(f"  GNSS fix acquired: {self._location}")
         else:
@@ -369,15 +369,15 @@ class MurataType1SCProfile(BaseDeviceProfile):
     def _parse_gnss_fix(self, urc: str):
         """Parse GNSS fix notification (SDD034).
 
-        Format: %IGNSSEVU:"FIX",1,"time","date","altitude","latitude","longitude",...
+        Format: %IGNSSEVU: "FIX",1,"time","date","lat","lon","alt",...
         """
         match = re.search(
-            r'%IGNSSEVU:"FIX",\d+,"[^"]*","[^"]*","([^"]*)","([^"]*)","([^"]*)"',
+            r'%IGNSSEVU:\s*"FIX",\d+,"[^"]*","[^"]*","([^"]*)","([^"]*)","([^"]*)"',
             urc,
         )
         if match:
-            latitude = match.group(2)
-            longitude = match.group(3)
+            latitude = match.group(1)
+            longitude = match.group(2)
             try:
                 self._location = (float(latitude), float(longitude))
             except ValueError:
