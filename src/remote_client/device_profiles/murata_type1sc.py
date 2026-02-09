@@ -4,6 +4,7 @@ Implements AT command sequences for Murata's Type 1SC-NTN module
 with AT shell firmware.
 """
 
+import base64
 import logging
 import re
 import threading
@@ -253,9 +254,9 @@ class MurataType1SCProfile(BaseDeviceProfile):
 
         Reads data from the allocated listen socket.
         """
-        socket_id = self._recv_socket_id or 1
+        socket_id = self._recv_socket_id or 2
         cmd = f'AT%SOCKETDATA="RECEIVE",{socket_id},1500'
-        success, resp = serial_manager.send_command(cmd, timeout=10)
+        success, resp = serial_manager.send_command(cmd, timeout=30)
         if not success:
             return None
 
@@ -270,9 +271,17 @@ class MurataType1SCProfile(BaseDeviceProfile):
                 src_ip = match.group(5)
                 src_port = int(match.group(6)) if match.group(6) else 0
 
-                # Decode HEX to ASCII
+                # Decode HEX to bytes, then try base64 (Soracom
+                # downlink API sends payloadType=base64).
                 try:
-                    payload = bytes.fromhex(rdata_hex).decode("utf-8")
+                    raw_bytes = bytes.fromhex(rdata_hex)
+                    text = raw_bytes.decode("utf-8")
+                    # Attempt base64 decode — Soracom wraps the
+                    # original message in base64.
+                    try:
+                        payload = base64.b64decode(text).decode("utf-8")
+                    except Exception:
+                        payload = text
                 except (ValueError, UnicodeDecodeError):
                     payload = rdata_hex
 
@@ -316,18 +325,30 @@ class MurataType1SCProfile(BaseDeviceProfile):
         if not success:
             return False
 
-        # Register handler for incoming data
+        # Register handler for incoming data.
+        # IMPORTANT: URC callbacks run on the _read_loop thread.
+        # receive_udp() calls send_command() which blocks waiting for a
+        # response that can only be read by _read_loop — deadlock.
+        # Dispatch to a separate thread to avoid blocking the read loop.
         buffer_size = self.config.get("network", {}).get("udp_buffer_size", 256)
 
         def socketev_handler(urc_line: str):
             if "%SOCKETEV:" in urc_line:
-                result = self.receive_udp(serial_manager, buffer_size)
-                if result:
-                    callback(result)
+                threading.Thread(
+                    target=self._handle_incoming,
+                    args=(serial_manager, buffer_size, callback),
+                    daemon=True,
+                ).start()
 
         serial_manager.register_urc_callback(socketev_handler)
         logger.info("  Receive listener active")
         return True
+
+    def _handle_incoming(self, serial_manager, buffer_size: int, callback):
+        """Handle incoming data on a separate thread (avoids _read_loop deadlock)."""
+        result = self.receive_udp(serial_manager, buffer_size)
+        if result:
+            callback(result)
 
     def subscribe_signal_quality(self, serial_manager) -> bool:
         """Subscribe to signal quality monitoring (SDD045)."""
