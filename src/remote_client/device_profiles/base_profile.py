@@ -73,3 +73,7 @@ class BaseDeviceProfile(ABC):
     def get_location(self) -> Optional[tuple]:
         """Get device GPS location if available. Returns (lat, lon) or None."""
         return None
+
+    def send_initial_location(self, serial_manager) -> bool:
+        """Send location to Harvest immediately after connection. No-op by default."""
+        return True

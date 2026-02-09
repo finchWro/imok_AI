@@ -189,6 +189,8 @@ class RemoteClientApp:
                 self.root.after(0, lambda: self.gui.add_chat_status(
                     f"GPS Location: {location[0]}, {location[1]}"
                 ))
+                # Auto-send location to Communicator immediately
+                self.device_profile.send_initial_location(self.serial)
 
         except Exception as e:
             logger.exception("Connection sequence failed")

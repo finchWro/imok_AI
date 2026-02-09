@@ -229,13 +229,24 @@ class MurataType1SCProfile(BaseDeviceProfile):
         """
         # Send location before first message (SDD040 exception)
         if not self._location_sent and self._location:
+            self.send_initial_location(serial_manager)
+
+        return self._send_hex_data(serial_manager, data)
+
+    def send_initial_location(self, serial_manager) -> bool:
+        """Send GNSS location to Harvest immediately (SDD040/SDD047).
+
+        Called automatically after connection and before first message.
+        """
+        if self._location and not self._location_sent:
             from src.common.message import LocationMessage
             loc_msg = LocationMessage(str(self._location[0]), str(self._location[1]))
             loc_data = loc_msg.encode()
-            self._send_hex_data(serial_manager, loc_data)
-            self._location_sent = True
-
-        return self._send_hex_data(serial_manager, data)
+            success = self._send_hex_data(serial_manager, loc_data)
+            if success:
+                self._location_sent = True
+            return success
+        return True
 
     def _send_hex_data(self, serial_manager, data: str) -> bool:
         """Send HEX-encoded data via socket (SDD040)."""
@@ -244,9 +255,9 @@ class MurataType1SCProfile(BaseDeviceProfile):
         cmd = f'AT%SOCKETDATA="SEND",1,{size},"{hex_data}"'
         logger.info(f"  Sending: {cmd}")
 
-        success, lines, urc = serial_manager.send_command_wait_urc(
-            cmd, "%SOCKETEV:1,1", timeout=30
-        )
+        # Use send_command (wait for OK) — don't wait for %SOCKETEV
+        # air-transmission confirmation, which can exceed 30s on NTN.
+        success, resp = serial_manager.send_command(cmd, timeout=30)
         return success
 
     def receive_udp(self, serial_manager, buffer_size: int) -> Optional[tuple]:
@@ -270,6 +281,10 @@ class MurataType1SCProfile(BaseDeviceProfile):
                 rdata_hex = match.group(4)
                 src_ip = match.group(5)
                 src_port = int(match.group(6)) if match.group(6) else 0
+
+                # Skip empty receives (length 0)
+                if rlength == 0 or not rdata_hex:
+                    return None
 
                 # Decode HEX to bytes, then try base64 (Soracom
                 # downlink API sends payloadType=base64).
@@ -331,14 +346,19 @@ class MurataType1SCProfile(BaseDeviceProfile):
         # response that can only be read by _read_loop — deadlock.
         # Dispatch to a separate thread to avoid blocking the read loop.
         buffer_size = self.config.get("network", {}).get("udp_buffer_size", 256)
+        listen_id = self._recv_socket_id or 2
 
         def socketev_handler(urc_line: str):
             if "%SOCKETEV:" in urc_line:
-                threading.Thread(
-                    target=self._handle_incoming,
-                    args=(serial_manager, buffer_size, callback),
-                    daemon=True,
-                ).start()
+                # Only handle events for the listen socket, not send socket.
+                # Format: %SOCKETEV:<event_type>,<socket_id>
+                ev_match = re.search(r'%SOCKETEV:\d+,(\d+)', urc_line)
+                if ev_match and int(ev_match.group(1)) == listen_id:
+                    threading.Thread(
+                        target=self._handle_incoming,
+                        args=(serial_manager, buffer_size, callback),
+                        daemon=True,
+                    ).start()
 
         serial_manager.register_urc_callback(socketev_handler)
         logger.info("  Receive listener active")
