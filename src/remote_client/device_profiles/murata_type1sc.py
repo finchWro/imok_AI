@@ -293,20 +293,21 @@ class MurataType1SCProfile(BaseDeviceProfile):
         """
         logger.info("  Setting up receive listener...")
 
-        # Allocate listen socket
+        # Allocate listen socket — use send_command_wait_urc so the
+        # %SOCKETCMD:<id> URC is captured even if it arrives before OK.
         cmd = f'AT%SOCKETCMD="ALLOCATE",1,"UDP","LISTEN","0.0.0.0",,{port}'
-        success, resp = serial_manager.send_command(cmd, timeout=15)
+        success, resp, urc = serial_manager.send_command_wait_urc(
+            cmd, "%SOCKETCMD:", timeout=15
+        )
         if not success:
             return False
 
-        # Wait for SOCKETCMD notification
-        ok, urc = serial_manager.wait_for_urc("%SOCKETCMD:", timeout=15)
-        if ok:
-            match = re.search(r'%SOCKETCMD:(\d+)', urc)
-            if match:
-                self._recv_socket_id = int(match.group(1))
+        match = re.search(r'%SOCKETCMD:(\d+)', urc)
+        if match:
+            self._recv_socket_id = int(match.group(1))
+            logger.info(f"  Listen socket allocated: ID {self._recv_socket_id}")
 
-        socket_id = self._recv_socket_id or 1
+        socket_id = self._recv_socket_id or 2
 
         # Activate listen socket
         success, resp = serial_manager.send_command(
