@@ -6,6 +6,7 @@ with AT shell firmware.
 
 import logging
 import re
+import threading
 from typing import Optional
 
 from .base_profile import BaseDeviceProfile
@@ -139,20 +140,42 @@ class MurataType1SCProfile(BaseDeviceProfile):
         # Step 16: Enable radio
         serial_manager.send_command("AT+CFUN=1", timeout=10)
 
-        # Step 17: Wait for SIB31 (satellite detection)
-        logger.info("  Waiting for satellite detection...")
-        serial_manager.wait_for_urc('%NOTIFYEV: "SIB31"', timeout=120)
+        # Step 17 + 18: Wait for satellite detection AND network registration
+        # Register a persistent CEREG listener BEFORE waiting for SIB31
+        # so we don't miss registrations that arrive during the SIB31 wait.
+        logger.info("  Waiting for satellite detection and network registration...")
+        cereg_event = threading.Event()
+        cereg_stat = [None]
 
-        # Step 18: Wait for network registration
-        logger.info("  Waiting for network registration...")
-        registered, urc = serial_manager.wait_for_urc("+CEREG:", timeout=120)
-        if registered:
-            parsed = self.parse_network_registration_urc(urc)
-            if parsed and parsed.get("stat") in [1, 5]:
-                logger.info(f"  Registered on NTN network (stat={parsed['stat']})")
+        def cereg_handler(urc_line: str):
+            if "+CEREG:" in urc_line:
+                parsed = self.parse_network_registration_urc(urc_line)
+                if parsed:
+                    stat = parsed.get("stat")
+                    cereg_stat[0] = stat
+                    logger.info(f"  CEREG stat={stat}")
+                    if stat in [1, 5]:
+                        cereg_event.set()
+
+        serial_manager.register_urc_callback(cereg_handler)
+
+        try:
+            # Wait for SIB31 (satellite detection)
+            serial_manager.wait_for_urc('%NOTIFYEV: "SIB31"', timeout=120)
+
+            # If not already registered during SIB31 wait, keep waiting
+            if not cereg_event.is_set():
+                logger.info("  Satellite detected. Waiting for network registration...")
+                cereg_event.wait(timeout=300)
+
+            if cereg_event.is_set():
+                logger.info(f"  Registered on NTN network (stat={cereg_stat[0]})")
                 return True
-        logger.error("  Failed to register on NTN network")
-        return False
+            else:
+                logger.error("  Failed to register on NTN network")
+                return False
+        finally:
+            serial_manager.unregister_urc_callback(cereg_handler)
 
     def configure_pdp_context(self, serial_manager) -> bool:
         """Configure PDP context for Murata (SDD036).

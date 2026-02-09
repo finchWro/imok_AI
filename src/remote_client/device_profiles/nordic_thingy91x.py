@@ -6,6 +6,7 @@ with AT shell firmware.
 
 import logging
 import re
+import threading
 from typing import Optional
 
 from .base_profile import BaseDeviceProfile
@@ -69,19 +70,32 @@ class NordicThingy91XProfile(BaseDeviceProfile):
             return False
 
         # Wait for +CEREG with stat=1 or stat=5
+        # Use a persistent listener that survives intermediate states (stat=2 etc.)
         logger.info("  Waiting for network registration...")
-        registered, urc = serial_manager.wait_for_urc("+CEREG:", timeout=120)
-        if registered:
-            parsed = self.parse_network_registration_urc(urc)
-            if parsed and parsed.get("stat") in [1, 5]:
-                logger.info(f"  Registered on network (stat={parsed['stat']})")
+        cereg_event = threading.Event()
+        cereg_stat = [None]
+
+        def cereg_handler(urc_line: str):
+            if "+CEREG:" in urc_line:
+                parsed = self.parse_network_registration_urc(urc_line)
+                if parsed:
+                    stat = parsed.get("stat")
+                    cereg_stat[0] = stat
+                    logger.info(f"  CEREG stat={stat}")
+                    if stat in [1, 5]:
+                        cereg_event.set()
+
+        serial_manager.register_urc_callback(cereg_handler)
+        try:
+            cereg_event.wait(timeout=120)
+            if cereg_event.is_set():
+                logger.info(f"  Registered on network (stat={cereg_stat[0]})")
                 return True
             else:
-                logger.warning(f"  CEREG received but not registered: {urc}")
+                logger.error("  Timeout waiting for network registration")
                 return False
-        else:
-            logger.error("  Timeout waiting for network registration")
-            return False
+        finally:
+            serial_manager.unregister_urc_callback(cereg_handler)
 
     def configure_pdp_context(self, serial_manager) -> bool:
         """Configure PDP context (SDD035)."""

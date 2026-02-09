@@ -68,6 +68,13 @@ class SerialManager:
         """Register a callback for unsolicited result codes (URCs)."""
         self._urc_callbacks.append(callback)
 
+    def unregister_urc_callback(self, callback: Callable[[str], None]):
+        """Remove a previously registered URC callback."""
+        try:
+            self._urc_callbacks.remove(callback)
+        except ValueError:
+            pass
+
     def register_raw_callback(self, callback: Callable[[str], None]):
         """Register a callback for all raw serial data (for message log)."""
         self._raw_callbacks.append(callback)
